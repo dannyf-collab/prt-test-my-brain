@@ -497,17 +497,33 @@ for (var b = 1; b <= CONFIG.TOTAL_BLOCKS; b++) {
 
 var save_data = {
   type: 'call-function',
-  func: function () {
+  async: true,
+  func: function (done) {
     if (CONFIG.SAVE_DATA_TYPE == 'tmb') {
       var results = jsPsych.data.get().ignore("internal_node_id").ignore("key_press").values();
       var score = 0;
       var outcomes = {};
       tmbSubmitToServer(results, score, outcomes);
     }
-    if (CONFIG.SAVE_DATA_TYPE == 'local') {
-      var randomID = jsPsych.randomization.randomID(6);
-      jsPsych.data.get().ignore("internal_node_id").ignore("key_press").localSave('csv', `prt-data-${randomID}.csv`)
-    }
+  if (CONFIG.SAVE_DATA_TYPE == 'local') {
+    var randomID = jsPsych.randomization.randomID(10);
+
+    var csvData = jsPsych.data.get()
+        .ignore("internal_node_id")
+        .ignore("key_press")
+        .csv();
+
+ DataPipe.saveData({
+    experiment_id: "2LtIQiIM2EQI",
+    filename: `prt-data-${randomID}.csv`,
+    data: csvData
+}).then(function () {
+    done();
+}).catch(function (error) {
+    console.error("DataPipe save failed:", error);
+    done();
+});
+}
     if (CONFIG.SAVE_DATA_TYPE == 'cognition') {
       return; // don't need to do anything because cognition.run automatically saves data.
     }
