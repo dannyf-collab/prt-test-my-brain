@@ -508,13 +508,19 @@ var save_data = {
 if (CONFIG.SAVE_DATA_TYPE == 'local') {
     var randomID = jsPsych.randomization.randomID(10);
 
-    // Save raw trial data
+    // -------------------------
+    // 1) SAVE RAW TRIAL DATA
+    // -------------------------
+
     var rawCsvData = jsPsych.data.get()
         .ignore("internal_node_id")
         .ignore("key_press")
         .csv();
 
-    // Pull only actual test-response trials
+    // -------------------------
+    // 2) PULL ACTUAL TEST TRIALS
+    // -------------------------
+
     var testData = jsPsych.data.get()
         .filter({ task: 'respond', phase: 'test' })
         .values();
@@ -530,44 +536,100 @@ if (CONFIG.SAVE_DATA_TYPE == 'local') {
             return Number(t.block) === blockNum;
         });
 
+        // Standard RT quality control
+        var validTrials = trials.filter(function(t) {
+            var rt = Number(t.rt);
+            return !isNaN(rt) && rt >= 150 && rt <= 1500;
+        });
+
         var richCorrect = 0;
         var richIncorrect = 0;
         var leanCorrect = 0;
         var leanIncorrect = 0;
-        var correctCount = 0;
-        var rts = [];
 
-        trials.forEach(function(t) {
+        var correctCount = 0;
+
+        var richTrialCount = 0;
+        var leanTrialCount = 0;
+
+        var richCorrectCount = 0;
+        var leanCorrectCount = 0;
+
+        var rts = [];
+        var richRTs = [];
+        var leanRTs = [];
+
+        validTrials.forEach(function(t) {
 
             var isRich = t.correct_shape === richShape;
-            var isCorrect = (t.correct === true || t.correct === "true");
+            var isCorrect =
+                (t.correct === true ||
+                 t.correct === "true" ||
+                 t.correct === "TRUE");
 
             if (isRich && isCorrect) richCorrect++;
             if (isRich && !isCorrect) richIncorrect++;
+
             if (!isRich && isCorrect) leanCorrect++;
             if (!isRich && !isCorrect) leanIncorrect++;
 
-            if (isCorrect) correctCount++;
+            if (isCorrect) {
+                correctCount++;
+            }
 
-            if (t.rt !== null && t.rt !== "" && !isNaN(Number(t.rt))) {
-                rts.push(Number(t.rt));
+            if (isRich) {
+                richTrialCount++;
+
+                if (isCorrect) {
+                    richCorrectCount++;
+                }
+            } else {
+                leanTrialCount++;
+
+                if (isCorrect) {
+                    leanCorrectCount++;
+                }
+            }
+
+            var rtValue = Number(t.rt);
+
+            if (!isNaN(rtValue)) {
+                rts.push(rtValue);
+
+                if (isRich) {
+                    richRTs.push(rtValue);
+                } else {
+                    leanRTs.push(rtValue);
+                }
             }
         });
 
+        // -------------------------
+        // 3) CALCULATE PRT SCORES
+        // -------------------------
+
         var responseBias =
-            0.5 * Math.log(
+            0.5 * Math.log10(
                 ((richCorrect + 0.5) * (leanIncorrect + 0.5)) /
                 ((richIncorrect + 0.5) * (leanCorrect + 0.5))
             );
 
         var discriminability =
-            0.5 * Math.log(
+            0.5 * Math.log10(
                 ((richCorrect + 0.5) * (leanCorrect + 0.5)) /
                 ((richIncorrect + 0.5) * (leanIncorrect + 0.5))
             );
 
-        var accuracy = trials.length > 0
-            ? correctCount / trials.length
+        var accuracy = validTrials.length > 0
+            ? correctCount / validTrials.length
+            : 0;
+
+        var richAccuracy = richTrialCount > 0
+            ? richCorrectCount / richTrialCount
+            : 0;
+
+        var leanAccuracy = leanTrialCount > 0
+            ? leanCorrectCount / leanTrialCount
             : 0;
 
         var meanRT = rts.length > 0
@@ -576,29 +638,74 @@ if (CONFIG.SAVE_DATA_TYPE == 'local') {
             }, 0) / rts.length
             : 0;
 
+        var richMeanRT = richRTs.length > 0
+            ? richRTs.reduce(function(a, b) {
+                return a + b;
+            }, 0) / richRTs.length
+            : 0;
+
+        var leanMeanRT = leanRTs.length > 0
+            ? leanRTs.reduce(function(a, b) {
+                return a + b;
+            }, 0) / leanRTs.length
+            : 0;
+
         summaryRows.push({
             Block: blockNum,
             Response_Bias: responseBias.toFixed(3),
             Discriminability: discriminability.toFixed(3),
-            Accuracy: (accuracy * 100).toFixed(0) + "%",
-            Mean_RT_ms: meanRT.toFixed(0)
+
+            Rich_Accuracy: (richAccuracy * 100).toFixed(0) + "%",
+            Lean_Accuracy: (leanAccuracy * 100).toFixed(0) + "%",
+            Overall_Accuracy: (accuracy * 100).toFixed(0) + "%",
+
+            Rich_Mean_RT_ms: richMeanRT.toFixed(0),
+            Lean_Mean_RT_ms: leanMeanRT.toFixed(0),
+            Overall_Mean_RT_ms: meanRT.toFixed(0),
+
+            Valid_Trials: validTrials.length
         });
     });
 
+    // -------------------------
+    // 4) REWARD LEARNING SCORE
+    // -------------------------
+
+    var rewardLearning =
+        Number(summaryRows[2].Response_Bias) -
+        Number(summaryRows[0].Response_Bias);
+
+    // -------------------------
+    // 5) CREATE CLEAN SUMMARY CSV
+    // -------------------------
+
     var summaryCsv =
-        "Block,Response Bias,Discriminability,Accuracy,Mean RT (ms)\n" +
+        "Block,Response Bias,Discriminability,Rich Accuracy,Lean Accuracy,Overall Accuracy,Rich Mean RT (ms),Lean Mean RT (ms),Overall Mean RT (ms),Valid Trials\n" +
+
         summaryRows.map(function(row) {
             return [
                 row.Block,
                 row.Response_Bias,
                 row.Discriminability,
-                row.Accuracy,
-                row.Mean_RT_ms
+                row.Rich_Accuracy,
+                row.Lean_Accuracy,
+                row.Overall_Accuracy,
+                row.Rich_Mean_RT_ms,
+                row.Lean_Mean_RT_ms,
+                row.Overall_Mean_RT_ms,
+                row.Valid_Trials
             ].join(",");
-        }).join("\n");
+        }).join("\n") +
 
-    // Upload BOTH files to DataPipe
+        "\n\nReward Learning (Block 3 - Block 1)," +
+        rewardLearning.toFixed(3);
+
+    // -------------------------
+    // 6) UPLOAD BOTH FILES
+    // -------------------------
+
     Promise.all([
+
         DataPipe.saveData({
             experiment_id: "2LtIQiIM2EQI",
             filename: `prt-raw-${randomID}.csv`,
@@ -610,6 +717,7 @@ if (CONFIG.SAVE_DATA_TYPE == 'local') {
             filename: `prt-summary-${randomID}.csv`,
             data: summaryCsv
         })
+
     ])
     .then(function () {
         done();
