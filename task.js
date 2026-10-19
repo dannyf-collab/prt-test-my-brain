@@ -505,24 +505,119 @@ var save_data = {
       var outcomes = {};
       tmbSubmitToServer(results, score, outcomes);
     }
-  if (CONFIG.SAVE_DATA_TYPE == 'local') {
+if (CONFIG.SAVE_DATA_TYPE == 'local') {
     var randomID = jsPsych.randomization.randomID(10);
 
-    var csvData = jsPsych.data.get()
+    // Save raw trial data
+    var rawCsvData = jsPsych.data.get()
         .ignore("internal_node_id")
         .ignore("key_press")
         .csv();
 
- DataPipe.saveData({
-    experiment_id: "2LtIQiIM2EQI",
-    filename: `prt-data-${randomID}.csv`,
-    data: csvData
-}).then(function () {
-    done();
-}).catch(function (error) {
-    console.error("DataPipe save failed:", error);
-    done();
-});
+    // Pull only actual test-response trials
+    var testData = jsPsych.data.get()
+        .filter({ task: 'respond', phase: 'test' })
+        .values();
+
+    var richShape = testData[0].bias_shape;
+
+    var blocks = [1, 2, 3];
+    var summaryRows = [];
+
+    blocks.forEach(function(blockNum) {
+
+        var trials = testData.filter(function(t) {
+            return Number(t.block) === blockNum;
+        });
+
+        var richCorrect = 0;
+        var richIncorrect = 0;
+        var leanCorrect = 0;
+        var leanIncorrect = 0;
+        var correctCount = 0;
+        var rts = [];
+
+        trials.forEach(function(t) {
+
+            var isRich = t.correct_shape === richShape;
+            var isCorrect = (t.correct === true || t.correct === "true");
+
+            if (isRich && isCorrect) richCorrect++;
+            if (isRich && !isCorrect) richIncorrect++;
+            if (!isRich && isCorrect) leanCorrect++;
+            if (!isRich && !isCorrect) leanIncorrect++;
+
+            if (isCorrect) correctCount++;
+
+            if (t.rt !== null && t.rt !== "" && !isNaN(Number(t.rt))) {
+                rts.push(Number(t.rt));
+            }
+        });
+
+        var responseBias =
+            0.5 * Math.log(
+                ((richCorrect + 0.5) * (leanIncorrect + 0.5)) /
+                ((richIncorrect + 0.5) * (leanCorrect + 0.5))
+            );
+
+        var discriminability =
+            0.5 * Math.log(
+                ((richCorrect + 0.5) * (leanCorrect + 0.5)) /
+                ((richIncorrect + 0.5) * (leanIncorrect + 0.5))
+            );
+
+        var accuracy = trials.length > 0
+            ? correctCount / trials.length
+            : 0;
+
+        var meanRT = rts.length > 0
+            ? rts.reduce(function(a, b) {
+                return a + b;
+            }, 0) / rts.length
+            : 0;
+
+        summaryRows.push({
+            Block: blockNum,
+            Response_Bias: responseBias.toFixed(3),
+            Discriminability: discriminability.toFixed(3),
+            Accuracy: (accuracy * 100).toFixed(0) + "%",
+            Mean_RT_ms: meanRT.toFixed(0)
+        });
+    });
+
+    var summaryCsv =
+        "Block,Response Bias,Discriminability,Accuracy,Mean RT (ms)\n" +
+        summaryRows.map(function(row) {
+            return [
+                row.Block,
+                row.Response_Bias,
+                row.Discriminability,
+                row.Accuracy,
+                row.Mean_RT_ms
+            ].join(",");
+        }).join("\n");
+
+    // Upload BOTH files to DataPipe
+    Promise.all([
+        DataPipe.saveData({
+            experiment_id: "2LtIQiIM2EQI",
+            filename: `prt-raw-${randomID}.csv`,
+            data: rawCsvData
+        }),
+
+        DataPipe.saveData({
+            experiment_id: "2LtIQiIM2EQI",
+            filename: `prt-summary-${randomID}.csv`,
+            data: summaryCsv
+        })
+    ])
+    .then(function () {
+        done();
+    })
+    .catch(function (error) {
+        console.error("DataPipe save failed:", error);
+        done();
+    });
 }
     if (CONFIG.SAVE_DATA_TYPE == 'cognition') {
       return; // don't need to do anything because cognition.run automatically saves data.
