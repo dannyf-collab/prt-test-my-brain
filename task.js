@@ -679,26 +679,24 @@ if (CONFIG.SAVE_DATA_TYPE == 'local') {
     // 5) CREATE CLEAN SUMMARY CSV
     // -------------------------
 
-    var summaryCsv =
-        "Block,Response Bias,Discriminability,Rich Accuracy,Lean Accuracy,Overall Accuracy,Rich Mean RT (ms),Lean Mean RT (ms),Overall Mean RT (ms),Valid Trials\n" +
+   var summaryCsv =
+    "Block,Response Bias,Discriminability,Rich Accuracy,Lean Accuracy,Overall Accuracy,Rich Mean RT (ms),Lean Mean RT (ms),Overall Mean RT (ms),Valid Trials,Reward Learning (B3-B1)\n" +
 
-        summaryRows.map(function(row) {
-            return [
-                row.Block,
-                row.Response_Bias,
-                row.Discriminability,
-                row.Rich_Accuracy,
-                row.Lean_Accuracy,
-                row.Overall_Accuracy,
-                row.Rich_Mean_RT_ms,
-                row.Lean_Mean_RT_ms,
-                row.Overall_Mean_RT_ms,
-                row.Valid_Trials
-            ].join(",");
-        }).join("\n") +
-
-        "\n\nReward Learning (Block 3 - Block 1)," +
-        rewardLearning.toFixed(3);
+    summaryRows.map(function(row, index) {
+        return [
+            row.Block,
+            row.Response_Bias,
+            row.Discriminability,
+            row.Rich_Accuracy,
+            row.Lean_Accuracy,
+            row.Overall_Accuracy,
+            row.Rich_Mean_RT_ms,
+            row.Lean_Mean_RT_ms,
+            row.Overall_Mean_RT_ms,
+            row.Valid_Trials,
+            index === 2 ? rewardLearning.toFixed(3) : ""
+        ].join(",");
+    }).join("\n");
 
     // -------------------------
     // 6) UPLOAD BOTH FILES
