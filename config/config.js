@@ -94,7 +94,7 @@ CONFIG.PRACTICE_TRIALS = [
 
 // SECTION 4 //
 CONFIG.TRIAL_INFO = [
-   { block: 1, trial: 1, stimulus: "img/7S_10C_yellow6.jpg", rewarded: 0 },
+  { block: 1, trial: 1, stimulus: "img/7S_10C_yellow6.jpg", rewarded: 0 },
   { block: 1, trial: 2, stimulus: "img/7C_10S_yellow5.jpg", rewarded: 1 },
 
   { block: 2, trial: 1, stimulus: "img/7S_10C_yellow7.jpg", rewarded: 0 },
@@ -102,4 +102,4 @@ CONFIG.TRIAL_INFO = [
 
   { block: 3, trial: 1, stimulus: "img/7S_10C_yellow8.jpg", rewarded: 0 },
   { block: 3, trial: 2, stimulus: "img/7C_10S_yellow3.jpg", rewarded: 1 }
-]
+];
